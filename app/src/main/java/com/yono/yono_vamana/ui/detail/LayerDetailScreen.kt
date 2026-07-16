@@ -16,18 +16,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,10 +54,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.yono.yono_vamana.data.IntelligencePreferences
 import com.yono.yono_vamana.data.VerifyPreferences
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
 import com.yono.yono_vamana.ui.theme.YonoGreenSuccess
 import com.yono.yono_vamana.ui.theme.YonoOrange
+import com.yono.yono_vamana.ui.theme.YonoPurple
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
 import com.yono.yono_vamana.ui.theme.YonoPurpleLight
@@ -65,8 +71,13 @@ import com.yono.yono_vamana.vamana.model.VamanaLayerRegistry
 
 @Composable
 fun LayerDetailScreen(layerInfo: VamanaLayerInfo, onBack: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    val context = LocalContext.current
+    val intelligencePreferences = remember { IntelligencePreferences(context) }
+    var isIntelligenceActive by remember { mutableStateOf(intelligencePreferences.isActive) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -139,6 +150,16 @@ fun LayerDetailScreen(layerInfo: VamanaLayerInfo, onBack: () -> Unit) {
                         VerifyActivationSection()
                         Spacer(modifier = Modifier.height(24.dp))
                     }
+                    if (layerInfo.id == VamanaLayerId.INTELLIGENCE) {
+                        IntelligenceActivationSection(
+                            isActive = isIntelligenceActive,
+                            onToggle = { checked ->
+                                isIntelligenceActive = checked
+                                intelligencePreferences.isActive = checked
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
                     Text(
                         text = "Overview",
                         style = MaterialTheme.typography.titleMedium,
@@ -166,6 +187,15 @@ fun LayerDetailScreen(layerInfo: VamanaLayerInfo, onBack: () -> Unit) {
                     IntegrationNoticeCard()
                 }
             }
+        }
+    }
+
+        if (layerInfo.id == VamanaLayerId.INTELLIGENCE && isIntelligenceActive) {
+            IntelligenceChatOverlay(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp)
+            )
         }
     }
 }
@@ -384,6 +414,112 @@ private fun VerifyActivationSection() {
                 Spacer(modifier = Modifier.height(12.dp))
                 ActiveStatusPill(label = "VAMANA-Verify is active")
             }
+        }
+    }
+}
+
+@Composable
+private fun IntelligenceActivationSection(isActive: Boolean, onToggle: (Boolean) -> Unit) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Adaptive on-device intelligence",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isActive) {
+                            "Risk signals are being fused into an on-device assessment."
+                        } else {
+                            "Not yet activated on this device."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = isActive,
+                    onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = YonoOrange,
+                        checkedThumbColor = Color.White
+                    )
+                )
+            }
+
+            if (isActive) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ActiveStatusPill(label = "VAMANA-Intelligence is active")
+            }
+        }
+    }
+}
+
+/**
+ * Floating chat entry point for the VAMANA agent, shown bottom-end only while
+ * VAMANA-Intelligence is active. The greeting bubble is dismissible on its
+ * own — closing it doesn't hide the chat button underneath.
+ */
+@Composable
+private fun IntelligenceChatOverlay(modifier: Modifier = Modifier) {
+    var showGreeting by remember { mutableStateOf(true) }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End
+    ) {
+        if (showGreeting) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                modifier = Modifier
+                    .padding(bottom = 12.dp)
+                    .widthIn(max = 220.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = "Hi, I am VAMANA agent",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { showGreeting = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Dismiss",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { /* Stub — no chat backend wired up yet. */ },
+            containerColor = YonoPurple,
+            contentColor = Color.White
+        ) {
+            Icon(imageVector = Icons.AutoMirrored.Filled.Chat, contentDescription = "VAMANA agent chat")
         }
     }
 }

@@ -13,8 +13,7 @@ enum class VamanaLayerId {
     INTERCEPT,
     ISOLATE,
     VERIFY,
-    INTELLIGENCE,
-    CORE
+    INTELLIGENCE
 }
 
 /** UI-facing description of a layer. Backed by dummy data until real modules are wired in. */
@@ -97,23 +96,23 @@ object VamanaLayerRegistry {
                 "Model last adapted" to "2026-07-15"
             )
         ),
-        VamanaLayerInfo(
-            id = VamanaLayerId.CORE,
-            codename = "VAMANA-Core",
-            title = "Core",
-            tagline = "Cost-escalation orchestration engine",
-            description = "Coordinates Intercept, Isolate, Verify, and Intelligence under " +
-                "a single cost-escalation model: cheap passive checks run first, and " +
-                "only content that keeps looking suspicious is escalated to " +
-                "progressively more expensive layers of scrutiny.",
-            status = "Stub — awaiting integration",
-            icon = Icons.Filled.Shield,
-            stats = listOf(
-                "Escalations today" to "2",
-                "Tier 3 blocks" to "0",
-                "Layers orchestrated" to "4"
-            )
-        )
+//        VamanaLayerInfo(
+//            id = VamanaLayerId.CORE,
+//            codename = "VAMANA-Core",
+//            title = "Core",
+//            tagline = "Cost-escalation orchestration engine",
+//            description = "Coordinates Intercept, Isolate, Verify, and Intelligence under " +
+//                "a single cost-escalation model: cheap passive checks run first, and " +
+//                "only content that keeps looking suspicious is escalated to " +
+//                "progressively more expensive layers of scrutiny.",
+//            status = "Stub — awaiting integration",
+//            icon = Icons.Filled.Shield,
+//            stats = listOf(
+//                "Escalations today" to "2",
+//                "Tier 3 blocks" to "0",
+//                "Layers orchestrated" to "4"
+//            )
+//        )
     )
 
     fun find(id: VamanaLayerId): VamanaLayerInfo = layers.first { it.id == id }
