@@ -1,6 +1,5 @@
-package com.yono.yono_vamana.vamana.verify.tee
+package com.yono.yono_vamana.vamana.verify
 
-import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -8,22 +7,36 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Talks to the local banking-server demo backend (banking-server/server.js).
+ * Talks to the local banking-server demo backend (banking-server/server.js),
+ * which in turn talks to telecom-server.js for Silent Network Authentication
+ * (SNA) — see that pair's doc comments for the full protocol.
  *
- * The phone reaches it at 127.0.0.1:8787 via `adb reverse tcp:8787 tcp:8787`
- * — the server runs on the dev machine, and adb reverse tunnels that port
- * back to the phone over the existing USB connection, avoiding any Wi-Fi/
- * LAN/firewall configuration.
+ * The phone reaches the bank at 127.0.0.1:8787 via `adb reverse tcp:8787
+ * tcp:8787` — the server runs on the dev machine, and adb reverse tunnels
+ * that port back to the phone over the existing USB connection, avoiding any
+ * Wi-Fi/LAN/firewall configuration. The bank talks to telecom directly on
+ * the dev machine (127.0.0.1:8788) — the phone never calls telecom itself,
+ * exactly like a real SNA integration where the bank's backend is the one
+ * with the telecom relationship, not the app.
  */
 object BankingServerClient {
 
     private const val BASE_URL = "http://127.0.0.1:8787"
 
+    /** The phone's real/demo network context sent with every confirm request. */
+    data class SnaContext(
+        val msisdn: String,
+        val deviceTransport: String,
+        val simDemoState: String
+    )
+
     data class TransactionResult(
-        val success: Boolean,
+        val status: String,
         val message: String,
         val newBalance: Long?
-    )
+    ) {
+        val isSuccess: Boolean get() = status == "success"
+    }
 
     /** Registers this device's TEE public key with the bank. Safe to call every time — idempotent. */
     suspend fun registerDevice(deviceId: String, publicKeyBase64: String): Boolean =
@@ -40,30 +53,43 @@ object BankingServerClient {
             }
         }
 
+    /**
+     * [signatureBase64] is null when VAMANA-Verify is inactive — the bank skips the
+     * TEE checks entirely in that case and relies on SNA alone. [sna] is always
+     * required; SNA runs on every confirmation regardless of the Verify toggle.
+     */
     suspend fun confirmTransaction(
         deviceId: String,
-        attestation: TeeAttestation
+        transactionId: String,
+        contactId: String,
+        contactName: String,
+        displayAmount: String,
+        timestamp: String,
+        signatureBase64: String?,
+        sna: SnaContext
     ): TransactionResult = withContext(Dispatchers.IO) {
         try {
-            val payload = attestation.payload
             val body = JSONObject().apply {
                 put("deviceId", deviceId)
-                put("transactionId", payload.transactionId)
-                put("contactId", payload.contactId)
-                put("contactName", payload.contactName)
-                put("displayAmount", payload.displayAmount)
-                put("timestamp", payload.timestamp)
-                put("signatureBase64", Base64.encodeToString(attestation.signature, Base64.NO_WRAP))
+                put("transactionId", transactionId)
+                put("contactId", contactId)
+                put("contactName", contactName)
+                put("displayAmount", displayAmount)
+                put("timestamp", timestamp)
+                if (signatureBase64 != null) put("signatureBase64", signatureBase64)
+                put("msisdn", sna.msisdn)
+                put("deviceTransport", sna.deviceTransport)
+                put("simDemoState", sna.simDemoState)
             }
             val response = postJson("$BASE_URL/transactions/confirm", body)
             TransactionResult(
-                success = response.optString("status") == "success",
+                status = response.optString("status", "error"),
                 message = response.optString("message", ""),
                 newBalance = if (response.has("newBalance")) response.getLong("newBalance") else null
             )
         } catch (e: Exception) {
             TransactionResult(
-                success = false,
+                status = "error",
                 message = "Could not reach the banking server: ${e.message}",
                 newBalance = null
             )

@@ -1,6 +1,7 @@
 package com.yono.yono_vamana.ui.transact
 
 import android.provider.Settings
+import android.util.Base64
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,10 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import com.yono.yono_vamana.data.VerifyPreferences
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
@@ -52,13 +58,16 @@ import com.yono.yono_vamana.ui.theme.YonoOrange
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
 import com.yono.yono_vamana.ui.theme.YonoPurpleLight
-import com.yono.yono_vamana.vamana.verify.tee.BankingServerClient
+import com.yono.yono_vamana.vamana.verify.BankingServerClient
 import com.yono.yono_vamana.vamana.verify.tee.FallbackPolicy
 import com.yono.yono_vamana.vamana.verify.tee.TeeConfirmResult
 import com.yono.yono_vamana.vamana.verify.tee.TeeSigningKeyManager
 import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionAuthenticator
 import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionPayload
+import com.yono.yono_vamana.vamana.verify.sna.CellularNetworkProvider
+import com.yono.yono_vamana.vamana.verify.sna.SnaDemoConfig
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 @Composable
 fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
@@ -68,77 +77,129 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
 
     var amount by remember { mutableStateOf("") }
+    var simState by remember { mutableStateOf("bound") } // bound | swapped — demo control, see CellularNetworkProvider doc
     var isConfirmed by remember { mutableStateOf(false) }
     var isAuthenticating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successNote by remember { mutableStateOf<String?>(null) }
     var newBalance by remember { mutableStateOf<Long?>(null) }
+    var phoneTrace by remember { mutableStateOf(listOf<String>()) }
 
     fun confirmPayment() {
         errorMessage = null
+        phoneTrace = emptyList()
 
-        if (!verifyPreferences.isActive) {
-            // VAMANA-Verify is off — behave as before, no authentication gate, no bank server call.
-            successNote = null
-            newBalance = null
-            isConfirmed = true
-            return
+        fun trace(line: String) {
+            phoneTrace = (phoneTrace + line).takeLast(20)
         }
 
-        val fragmentActivity = activity
-        if (fragmentActivity == null) {
-            errorMessage = "Could not start secure authentication."
-            return
-        }
+        val transactionId = "txn_${System.currentTimeMillis()}"
+        val timestamp = Instant.now().toString()
 
         isAuthenticating = true
         coroutineScope.launch {
-            val payload = TeeTransactionPayload(
-                transactionId = "txn_${System.currentTimeMillis()}",
-                contactId = contact.id,
-                contactName = contact.name,
-                displayAmount = "₹$amount"
-            )
-            val result = TeeTransactionAuthenticator(fragmentActivity).confirmTransaction(payload)
+            // ── Real network detection (not simulated) — the SNA transport signal ──
+            val netProvider = CellularNetworkProvider(context)
+            val activeTransport = netProvider.detectActiveTransport()
+            trace("ConnectivityManager: active transport = $activeTransport")
 
-            when (result) {
-                is TeeConfirmResult.Success -> {
-                    val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-                        ?: "unknown_device"
-                    BankingServerClient.registerDevice(deviceId, TeeSigningKeyManager.getPublicKeyBase64())
-                    val txResult = BankingServerClient.confirmTransaction(deviceId, result.attestation)
+            var deviceTransport = activeTransport
+            if (activeTransport != "CELLULAR") {
+                trace("requesting Network bound to TRANSPORT_CELLULAR…")
+                val cellularNetwork = netProvider.requestCellularNetwork()
+                trace(if (cellularNetwork != null) "cellular network bound" else "no cellular network available")
+                if (cellularNetwork != null) deviceTransport = "CELLULAR"
+            }
+            netProvider.release()
+
+            // ── TEE step — only when VAMANA-Verify is active; SNA below always runs ──
+            var signatureBase64: String? = null
+            var teeNote: String? = null
+
+            if (verifyPreferences.isActive) {
+                val fragmentActivity = activity
+                if (fragmentActivity == null) {
                     isAuthenticating = false
-                    if (txResult.success) {
-                        successNote = "Authenticated via device TEE."
-                        newBalance = txResult.newBalance
-                        isConfirmed = true
-                    } else {
-                        errorMessage = txResult.message.ifBlank { "The bank rejected this transaction." }
+                    errorMessage = "Could not start secure authentication."
+                    return@launch
+                }
+                trace("VAMANA-Verify active — requesting TEE authentication…")
+                val payload = TeeTransactionPayload(
+                    transactionId = transactionId,
+                    contactId = contact.id,
+                    contactName = contact.name,
+                    displayAmount = "₹$amount",
+                    timestamp = timestamp
+                )
+                when (val result = TeeTransactionAuthenticator(fragmentActivity).confirmTransaction(payload)) {
+                    is TeeConfirmResult.Success -> {
+                        trace("TEE signature obtained")
+                        signatureBase64 = Base64.encodeToString(result.attestation.signature, Base64.NO_WRAP)
+                        val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                            ?: "unknown_device"
+                        BankingServerClient.registerDevice(deviceId, TeeSigningKeyManager.getPublicKeyBase64())
+                        teeNote = "TEE"
                     }
-                }
-
-                is TeeConfirmResult.Cancelled -> {
-                    isAuthenticating = false
-                    errorMessage = "Authentication was cancelled."
-                }
-
-                is TeeConfirmResult.Unavailable -> {
-                    isAuthenticating = false
-                    val amountRupees = amount.toLongOrNull() ?: 0L
-                    when (val decision = FallbackPolicy.evaluate(amountRupees, result.reason)) {
-                        is FallbackPolicy.Decision.Blocked -> errorMessage = decision.message
-                        is FallbackPolicy.Decision.ProceedWithWarning -> {
-                            successNote = decision.message
-                            newBalance = null
-                            isConfirmed = true
+                    is TeeConfirmResult.Cancelled -> {
+                        isAuthenticating = false
+                        errorMessage = "Authentication was cancelled."
+                        return@launch
+                    }
+                    is TeeConfirmResult.Unavailable -> {
+                        val amountRupees = amount.toLongOrNull() ?: 0L
+                        when (val decision = FallbackPolicy.evaluate(amountRupees, result.reason)) {
+                            is FallbackPolicy.Decision.Blocked -> {
+                                isAuthenticating = false
+                                errorMessage = decision.message
+                                return@launch
+                            }
+                            is FallbackPolicy.Decision.ProceedWithWarning -> {
+                                trace("TEE unavailable (${result.reason}) — proceeding on SNA alone")
+                            }
                         }
                     }
+                    is TeeConfirmResult.Error -> {
+                        isAuthenticating = false
+                        errorMessage = result.message
+                        return@launch
+                    }
                 }
+            } else {
+                trace("VAMANA-Verify inactive — skipping TEE, SNA only")
+            }
 
-                is TeeConfirmResult.Error -> {
-                    isAuthenticating = false
-                    errorMessage = result.message
+            // ── SNA step — always runs, independent of the TEE step above ──
+            trace("POST /transactions/confirm  transport=$deviceTransport  sim=$simState")
+            val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                ?: "unknown_device"
+            val txResult = BankingServerClient.confirmTransaction(
+                deviceId = deviceId,
+                transactionId = transactionId,
+                contactId = contact.id,
+                contactName = contact.name,
+                displayAmount = "₹$amount",
+                timestamp = timestamp,
+                signatureBase64 = signatureBase64,
+                sna = BankingServerClient.SnaContext(
+                    msisdn = SnaDemoConfig.DEMO_MSISDN,
+                    deviceTransport = deviceTransport,
+                    simDemoState = simState
+                )
+            )
+            trace("<- ${txResult.status}  ${txResult.message}")
+            isAuthenticating = false
+
+            when (txResult.status) {
+                "success" -> {
+                    successNote = if (teeNote != null) {
+                        "Authenticated via device TEE and Silent Network Authentication."
+                    } else {
+                        "Authenticated via Silent Network Authentication."
+                    }
+                    newBalance = txResult.newBalance
+                    isConfirmed = true
                 }
+                else -> errorMessage = txResult.message.ifBlank { "The bank rejected this transaction." }
             }
         }
     }
@@ -201,6 +262,8 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                         newBalance = newBalance,
                         onDone = onBack
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PhoneTraceCard(phoneTrace)
                 } else {
                     OutlinedTextField(
                         value = amount,
@@ -215,7 +278,33 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "SIM binding (demo control)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row {
+                        FilterChip(
+                            selected = simState == "bound",
+                            onClick = { simState = "bound" },
+                            label = { Text("Bound") },
+                            enabled = !isAuthenticating,
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = YonoGreenSuccess.copy(alpha = 0.2f))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilterChip(
+                            selected = simState == "swapped",
+                            onClick = { simState = "swapped" },
+                            label = { Text("Swapped") },
+                            enabled = !isAuthenticating,
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.errorContainer)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
+
                     Button(
                         onClick = ::confirmPayment,
                         enabled = amount.isNotBlank() && !isAuthenticating,
@@ -251,7 +340,40 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+
+                    if (phoneTrace.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        PhoneTraceCard(phoneTrace)
+                    }
                 }
+            }
+        }
+    }
+}
+
+/** "Mobile phone terminal" — the on-device half of the 3-terminal SNA trace. */
+@Composable
+private fun PhoneTraceCard(lines: List<String>) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF15111F)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Mobile phone terminal",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF9CE89C)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            lines.forEach { line ->
+                Text(
+                    text = line,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = Color(0xFFD4D4D4)
+                )
             }
         }
     }
