@@ -2,6 +2,7 @@ package com.yono.yono_vamana.ui.transact
 
 import android.provider.Settings
 import android.util.Base64
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,12 +45,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import com.yono.yono_vamana.data.VerifyPreferences
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
@@ -69,6 +68,9 @@ import com.yono.yono_vamana.vamana.verify.sna.SnaDemoConfig
 import kotlinx.coroutines.launch
 import java.time.Instant
 
+/** adb logcat -s VamanaSNA:I — the "mobile phone terminal", viewed on the dev machine over USB. */
+private const val SNA_LOG_TAG = "VamanaSNA"
+
 @Composable
 fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -83,15 +85,14 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successNote by remember { mutableStateOf<String?>(null) }
     var newBalance by remember { mutableStateOf<Long?>(null) }
-    var phoneTrace by remember { mutableStateOf(listOf<String>()) }
+
+    fun trace(line: String) {
+        Log.i(SNA_LOG_TAG, line)
+    }
 
     fun confirmPayment() {
         errorMessage = null
-        phoneTrace = emptyList()
-
-        fun trace(line: String) {
-            phoneTrace = (phoneTrace + line).takeLast(20)
-        }
+        trace("── Confirm tapped: ₹$amount to ${contact.name} ──────────────")
 
         val transactionId = "txn_${System.currentTimeMillis()}"
         val timestamp = Instant.now().toString()
@@ -262,8 +263,6 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                         newBalance = newBalance,
                         onDone = onBack
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PhoneTraceCard(phoneTrace)
                 } else {
                     OutlinedTextField(
                         value = amount,
@@ -340,40 +339,7 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-
-                    if (phoneTrace.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        PhoneTraceCard(phoneTrace)
-                    }
                 }
-            }
-        }
-    }
-}
-
-/** "Mobile phone terminal" — the on-device half of the 3-terminal SNA trace. */
-@Composable
-private fun PhoneTraceCard(lines: List<String>) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF15111F)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Mobile phone terminal",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF9CE89C)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            lines.forEach { line ->
-                Text(
-                    text = line,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = Color(0xFFD4D4D4)
-                )
             }
         }
     }
