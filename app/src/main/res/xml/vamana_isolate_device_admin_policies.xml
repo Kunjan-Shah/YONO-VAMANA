@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Declares which Device Admin policies WorkProfileAdminReceiver uses.
+    VAMANA-Isolate only needs Profile Owner status to provision and enable
+    the isolated work profile — no additional policies are requested.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies />
+</device-admin>
