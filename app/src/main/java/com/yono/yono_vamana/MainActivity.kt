@@ -29,7 +29,12 @@ class MainActivity : ComponentActivity() {
         }
 
         val onboardingPreferences = OnboardingPreferences(this)
-        val startDestination = if (onboardingPreferences.isSetupComplete) {
+        val startDestination = if (isWorkProfile || onboardingPreferences.isSetupComplete) {
+            // Onboarding preferences are per-profile SharedPreferences, so
+            // the work-profile instance would otherwise always look like a
+            // fresh install. Reaching the work profile at all already implies
+            // setup happened (from the personal-profile Isolate screen) —
+            // go straight to the dashboard.
             VamanaDestination.Dashboard.route
         } else {
             VamanaDestination.SecuritySetup.route

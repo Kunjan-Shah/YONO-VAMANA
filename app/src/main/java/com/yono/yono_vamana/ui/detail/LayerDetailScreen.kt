@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
+import com.yono.yono_vamana.ui.theme.YonoGreenSuccess
 import com.yono.yono_vamana.ui.theme.YonoOrange
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
@@ -177,6 +180,7 @@ private fun IsolateWorkProfileSection() {
     val context = LocalContext.current
     val activity = context as? Activity
     val workProfileManager = remember { WorkProfileManager(context.applicationContext) }
+    val isInWorkProfile = remember { workProfileManager.isRunningInWorkProfile() }
 
     var isProvisioned by remember { mutableStateOf(workProfileManager.isProfileReady()) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -207,7 +211,17 @@ private fun IsolateWorkProfileSection() {
             )
             Spacer(modifier = Modifier.height(4.dp))
 
-            if (isProvisioned) {
+            if (isInWorkProfile) {
+                // We're already running inside the isolated profile — there's
+                // nothing to "navigate to", just confirm it's active.
+                Text(
+                    text = "You're currently inside the isolated work profile.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ActiveStatusPill()
+            } else if (isProvisioned) {
                 Text(
                     text = "The isolated work profile is active on this device.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -263,6 +277,33 @@ private fun IsolateWorkProfileSection() {
                     color = MaterialTheme.colorScheme.error
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ActiveStatusPill() {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = YonoGreenSuccess.copy(alpha = 0.15f)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = YonoGreenSuccess,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "VAMANA-Isolate is active",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = YonoGreenSuccess
+            )
         }
     }
 }
