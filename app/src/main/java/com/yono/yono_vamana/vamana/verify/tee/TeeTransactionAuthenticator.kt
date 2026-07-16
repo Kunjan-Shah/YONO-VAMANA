@@ -12,12 +12,18 @@ import kotlin.coroutines.resume
 /** The transaction details bound into the signed attestation. */
 data class TeeTransactionPayload(
     val transactionId: String,
+    val contactId: String,
     val contactName: String,
     val displayAmount: String,
     val timestamp: String = Instant.now().toString()
 ) {
+    /**
+     * Must match the banking server's reconstruction of the signed text
+     * byte-for-byte (see banking-server/server.js's handleConfirm) — field
+     * order and the '|' delimiter are part of the contract between them.
+     */
     fun toSignableBytes(): ByteArray =
-        "$transactionId|$contactName|$displayAmount|$timestamp".toByteArray(Charsets.UTF_8)
+        "$transactionId|$contactId|$contactName|$displayAmount|$timestamp".toByteArray(Charsets.UTF_8)
 }
 
 /** Cryptographic proof that this exact payload was signed after a real biometric match. */

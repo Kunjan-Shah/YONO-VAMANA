@@ -1,6 +1,8 @@
 package com.yono.yono_vamana.ui.transact
 
+import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,14 +18,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -48,14 +51,25 @@ import com.yono.yono_vamana.data.VerifyPreferences
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
 import com.yono.yono_vamana.ui.theme.YonoGreenSuccess
 import com.yono.yono_vamana.ui.theme.YonoOrange
+import com.yono.yono_vamana.ui.theme.YonoPurple
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
 import com.yono.yono_vamana.ui.theme.YonoPurpleLight
+import com.yono.yono_vamana.vamana.verify.tee.BankingServerClient
 import com.yono.yono_vamana.vamana.verify.tee.FallbackPolicy
 import com.yono.yono_vamana.vamana.verify.tee.TeeConfirmResult
+import com.yono.yono_vamana.vamana.verify.tee.TeeSigningKeyManager
 import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionAuthenticator
 import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionPayload
 import kotlinx.coroutines.launch
+
+/** Drives the full-screen payment confirmation experience — each state below is a distinct screen. */
+private sealed class PaymentUiState {
+    data object Form : PaymentUiState()
+    data class Processing(val message: String) : PaymentUiState()
+    data class Success(val newBalance: Long?, val note: String?) : PaymentUiState()
+    data class Failed(val message: String) : PaymentUiState()
+}
 
 @Composable
 fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
@@ -65,67 +79,107 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
 
     var amount by remember { mutableStateOf("") }
-    var isConfirmed by remember { mutableStateOf(false) }
-    var isAuthenticating by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successNote by remember { mutableStateOf<String?>(null) }
+    var uiState by remember { mutableStateOf<PaymentUiState>(PaymentUiState.Form) }
 
     fun confirmPayment() {
-        errorMessage = null
-
         if (!verifyPreferences.isActive) {
-            // VAMANA-Verify is off — behave as before, no authentication gate.
-            successNote = null
-            isConfirmed = true
+            // VAMANA-Verify is off — behave as before, no authentication gate, no bank server call.
+            uiState = PaymentUiState.Success(newBalance = null, note = null)
             return
         }
 
         val fragmentActivity = activity
         if (fragmentActivity == null) {
-            errorMessage = "Could not start secure authentication."
+            uiState = PaymentUiState.Failed("Could not start secure authentication.")
             return
         }
 
-        isAuthenticating = true
+        uiState = PaymentUiState.Processing("Verifying via secure hardware…")
         coroutineScope.launch {
             val payload = TeeTransactionPayload(
                 transactionId = "txn_${System.currentTimeMillis()}",
+                contactId = contact.id,
                 contactName = contact.name,
                 displayAmount = "₹$amount"
             )
             val result = TeeTransactionAuthenticator(fragmentActivity).confirmTransaction(payload)
-            isAuthenticating = false
 
             when (result) {
                 is TeeConfirmResult.Success -> {
-                    successNote = "Authenticated via device TEE."
-                    isConfirmed = true
+                    uiState = PaymentUiState.Processing("Confirming with bank…")
+                    val deviceId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+                        ?: "unknown_device"
+                    BankingServerClient.registerDevice(deviceId, TeeSigningKeyManager.getPublicKeyBase64())
+                    val txResult = BankingServerClient.confirmTransaction(deviceId, result.attestation)
+                    uiState = if (txResult.success) {
+                        PaymentUiState.Success(txResult.newBalance, "Authenticated via device TEE.")
+                    } else {
+                        PaymentUiState.Failed(txResult.message.ifBlank { "The bank rejected this transaction." })
+                    }
                 }
 
                 is TeeConfirmResult.Cancelled -> {
-                    errorMessage = "Authentication was cancelled."
+                    uiState = PaymentUiState.Failed("Authentication was cancelled.")
                 }
 
                 is TeeConfirmResult.Unavailable -> {
                     val amountRupees = amount.toLongOrNull() ?: 0L
-                    when (val decision = FallbackPolicy.evaluate(amountRupees, result.reason)) {
-                        is FallbackPolicy.Decision.Blocked -> {
-                            errorMessage = decision.message
-                        }
-                        is FallbackPolicy.Decision.ProceedWithWarning -> {
-                            successNote = decision.message
-                            isConfirmed = true
-                        }
+                    uiState = when (val decision = FallbackPolicy.evaluate(amountRupees, result.reason)) {
+                        is FallbackPolicy.Decision.Blocked -> PaymentUiState.Failed(decision.message)
+                        is FallbackPolicy.Decision.ProceedWithWarning ->
+                            PaymentUiState.Success(newBalance = null, note = decision.message)
                     }
                 }
 
                 is TeeConfirmResult.Error -> {
-                    errorMessage = result.message
+                    uiState = PaymentUiState.Failed(result.message)
                 }
             }
         }
     }
 
+    when (val state = uiState) {
+        is PaymentUiState.Form -> PaymentFormScreen(
+            contact = contact,
+            amount = amount,
+            onAmountChange = { amount = it },
+            onBack = onBack,
+            onConfirm = ::confirmPayment
+        )
+        is PaymentUiState.Processing -> TeeProcessingScreen(
+            contact = contact,
+            amount = amount,
+            message = state.message
+        )
+        is PaymentUiState.Success -> PaymentResultScreen(
+            isSuccess = true,
+            title = "Payment confirmed",
+            message = "₹$amount paid to ${contact.name} (dummy transaction).",
+            note = state.note,
+            newBalance = state.newBalance,
+            onPrimaryAction = onBack,
+            onRetry = null
+        )
+        is PaymentUiState.Failed -> PaymentResultScreen(
+            isSuccess = false,
+            title = "Payment failed",
+            message = state.message,
+            note = null,
+            newBalance = null,
+            onPrimaryAction = onBack,
+            onRetry = { uiState = PaymentUiState.Form }
+        )
+    }
+}
+
+@Composable
+private fun PaymentFormScreen(
+    contact: DummyContact,
+    amount: String,
+    onAmountChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -176,123 +230,170 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                     .weight(1f)
                     .padding(20.dp)
             ) {
-                if (isConfirmed) {
-                    PaymentSuccessCard(
-                        contact = contact,
-                        amount = amount,
-                        note = successNote,
-                        onDone = onBack
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { input -> onAmountChange(input.filter { it.isDigit() }) },
+                    label = { Text("Amount (₹)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = YonoPurpleDark,
+                        focusedLabelColor = YonoPurpleDark
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onConfirm,
+                    enabled = amount.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = YonoOrange,
+                        contentColor = Color.White
                     )
-                } else {
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { input -> amount = input.filter { it.isDigit() } },
-                        label = { Text("Amount (₹)") },
-                        singleLine = true,
-                        enabled = !isAuthenticating,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = YonoPurpleDark,
-                            focusedLabelColor = YonoPurpleDark
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Confirm",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = ::confirmPayment,
-                        enabled = amount.isNotBlank() && !isAuthenticating,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = YonoOrange,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        if (isAuthenticating) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        } else {
-                            Text(
-                                text = "Confirm",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    errorMessage?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Full-screen backdrop shown while the TEE flow is running. The system
+ * BiometricPrompt dialog appears on top of this screen (Android owns that
+ * dialog — no app can render its own biometric UI), but the surrounding
+ * experience is now a dedicated full-screen moment instead of a small
+ * in-form card, and the transaction details stay visible throughout.
+ */
 @Composable
-private fun PaymentSuccessCard(
-    contact: DummyContact,
-    amount: String,
-    note: String?,
-    onDone: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = YonoGreenSuccess.copy(alpha = 0.12f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
+private fun TeeProcessingScreen(contact: DummyContact, amount: String, message: String) {
+    Surface(modifier = Modifier.fillMaxSize(), color = YonoPurpleDarkest) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Surface(shape = CircleShape, color = YonoGreenSuccess.copy(alpha = 0.2f), modifier = Modifier.size(56.dp)) {
+            Surface(shape = CircleShape, color = YonoPurpleLight.copy(alpha = 0.25f), modifier = Modifier.size(96.dp)) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(
-                        imageVector = Icons.Filled.CheckCircle,
+                        imageVector = Icons.Filled.Fingerprint,
                         contentDescription = null,
-                        tint = YonoGreenSuccess,
-                        modifier = Modifier.size(32.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(52.dp)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(28.dp))
             Text(
-                text = "Payment confirmed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = YonoGreenSuccess
+                text = "₹$amount to ${contact.name}",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            CircularProgressIndicator(color = YonoOrange, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "₹$amount paid to ${contact.name} (dummy transaction).",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.85f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaymentResultScreen(
+    isSuccess: Boolean,
+    title: String,
+    message: String,
+    note: String?,
+    newBalance: Long?,
+    onPrimaryAction: () -> Unit,
+    onRetry: (() -> Unit)?
+) {
+    val accentColor = if (isSuccess) YonoGreenSuccess else MaterialTheme.colorScheme.error
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(shape = CircleShape, color = accentColor.copy(alpha = 0.15f), modifier = Modifier.size(88.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = if (isSuccess) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = accentColor
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             note?.let {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            newBalance?.let {
+                Spacer(modifier = Modifier.height(16.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = accentColor.copy(alpha = 0.08f)
+                ) {
+                    Text(
+                        text = "New balance at bank: ₹$it",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(28.dp))
             Button(
-                onClick = onDone,
+                onClick = onPrimaryAction,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = YonoGreenSuccess, contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Done")
+                Text(if (isSuccess) "Done" else "Back to Transact")
+            }
+            onRetry?.let { retry ->
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = retry,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = YonoPurple),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Try again")
+                }
             }
         }
     }

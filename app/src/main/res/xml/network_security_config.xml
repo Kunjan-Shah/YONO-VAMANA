@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Permits cleartext HTTP only to the loopback address — the phone reaches
+    the banking-server demo backend at 127.0.0.1:8787 via `adb reverse`,
+    which requires plain HTTP. Every other destination keeps Android's
+    default cleartext-blocked behavior.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

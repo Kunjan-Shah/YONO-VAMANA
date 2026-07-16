@@ -2,6 +2,7 @@ package com.yono.yono_vamana.vamana.verify.tee
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Base64
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -21,9 +22,27 @@ object TeeSigningKeyManager {
 
     /** Returns the existing signing key for this profile, generating it on first use. */
     fun getOrCreateKey(): PrivateKey {
-        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val keyStore = keyStore()
         (keyStore.getKey(KEY_ALIAS, null) as? PrivateKey)?.let { return it }
+        generateKey()
+        return keyStore().getKey(KEY_ALIAS, null) as PrivateKey
+    }
 
+    /**
+     * The public half of the signing key, X.509 SubjectPublicKeyInfo DER
+     * bytes, base64-encoded — what the banking server needs to verify
+     * signatures produced by this device's key.
+     */
+    fun getPublicKeyBase64(): String {
+        val keyStore = keyStore()
+        if (keyStore.getCertificate(KEY_ALIAS) == null) generateKey()
+        val certificate = keyStore().getCertificate(KEY_ALIAS)
+        return Base64.encodeToString(certificate.publicKey.encoded, Base64.NO_WRAP)
+    }
+
+    private fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+
+    private fun generateKey() {
         val spec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
             KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
@@ -34,6 +53,6 @@ object TeeSigningKeyManager {
 
         val keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
         keyPairGenerator.initialize(spec)
-        return keyPairGenerator.generateKeyPair().private
+        keyPairGenerator.generateKeyPair()
     }
 }
