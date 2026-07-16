@@ -1,9 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Declares which Device Admin policies WorkProfileAdminReceiver uses.
-    VAMANA-Isolate only needs Profile Owner status to provision and enable
-    the isolated work profile — no additional policies are requested.
+    Referenced via android.app.device_admin metadata. The system presents
+    this list to the user during the device admin activation flow.
+
+    Every policy PolicyEnforcer calls that's gated by the legacy Device
+    Administration API surface must be declared here, or the corresponding
+    DevicePolicyManager call throws a SecurityException at runtime.
 -->
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-policies />
+    <uses-policies>
+
+        <!-- Enforce minimum password quality on the work profile lock screen. -->
+        <limit-password />
+
+        <!-- Receive notification of failed/succeeded unlock attempts. -->
+        <watch-login />
+
+        <!-- Ability to set/reset the work profile challenge credential. -->
+        <reset-password />
+
+        <!-- Programmatically lock the work profile immediately. -->
+        <force-lock />
+
+        <!-- Wipe the managed profile entirely (this profile only, not personal). -->
+        <wipe-data />
+
+        <!-- Set maximum credential age for the work profile challenge. -->
+        <expire-password />
+
+        <!-- Require that work profile storage is encrypted. -->
+        <encrypted-storage />
+
+        <!-- Disable camera access within the work profile. -->
+        <disable-camera />
+
+        <!-- Selectively disable keyguard features (trust agents, unredacted notifications). -->
+        <disable-keyguard-features />
+
+    </uses-policies>
 </device-admin>

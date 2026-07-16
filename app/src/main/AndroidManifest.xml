@@ -2,6 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+    ── Root-management package visibility ──────────────────────────────────
+       HealthCheckEngine's DEVICE_ROOTED check looks for these specific
+       packages by name. Without declaring them here, PackageManager would
+       report them as not installed even when they are (API 30+ package
+       visibility filtering), silently weakening the check.
+    -->
+    <queries>
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="eu.chainfire.supersu" />
+        <package android:name="com.noshufou.android.su" />
+        <package android:name="com.koushikdutta.superuser" />
+        <package android:name="com.thirdparty.superuser" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

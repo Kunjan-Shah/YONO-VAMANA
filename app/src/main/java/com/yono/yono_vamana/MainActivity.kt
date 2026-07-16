@@ -7,12 +7,26 @@ import androidx.activity.enableEdgeToEdge
 import com.yono.yono_vamana.data.OnboardingPreferences
 import com.yono.yono_vamana.navigation.VamanaDestination
 import com.yono.yono_vamana.navigation.VamanaNavGraph
+import com.yono.yono_vamana.ui.health.HealthCheckBlockedScreen
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
+import com.yono.yono_vamana.vamana.isolate.WorkProfileManager
+import com.yono.yono_vamana.vamana.isolate.health.HealthCheckEngine
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val isWorkProfile = WorkProfileManager(this).isRunningInWorkProfile()
+
+        // The VAMANA-Isolate work profile must pass its health checks every
+        // time it's opened — from its own launcher icon or via "Navigate to
+        // secure setup" — before showing any app content.
+        val healthCheckReport = if (isWorkProfile) {
+            HealthCheckEngine(this).runAllChecks()
+        } else {
+            null
+        }
 
         val onboardingPreferences = OnboardingPreferences(this)
         val startDestination = if (onboardingPreferences.isSetupComplete) {
@@ -23,10 +37,17 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             YONOVAMANATheme {
-                VamanaNavGraph(
-                    startDestination = startDestination,
-                    onSetupComplete = { onboardingPreferences.isSetupComplete = true }
-                )
+                if (healthCheckReport != null && !healthCheckReport.isLaunchAllowed) {
+                    HealthCheckBlockedScreen(
+                        report = healthCheckReport,
+                        onExit = { finishAffinity() }
+                    )
+                } else {
+                    VamanaNavGraph(
+                        startDestination = startDestination,
+                        onSetupComplete = { onboardingPreferences.isSetupComplete = true }
+                    )
+                }
             }
         }
     }

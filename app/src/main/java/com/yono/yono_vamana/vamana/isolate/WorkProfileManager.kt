@@ -108,6 +108,9 @@ class WorkProfileManager(private val context: Context) {
         }
     }
 
+    /** True when this process is running inside the managed work profile, not the personal one. */
+    fun isRunningInWorkProfile(): Boolean = userManager.isManagedProfile
+
     enum class ProvisioningBlockReason(val userMessage: String) {
         SYSTEM_UNSUPPORTED(
             "This device does not support isolated work profiles."
