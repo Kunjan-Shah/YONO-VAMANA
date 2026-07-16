@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,8 +31,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,12 +50,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.yono.yono_vamana.data.VerifyPreferences
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
 import com.yono.yono_vamana.ui.theme.YonoGreenSuccess
 import com.yono.yono_vamana.ui.theme.YonoOrange
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
 import com.yono.yono_vamana.ui.theme.YonoPurpleLight
+import com.yono.yono_vamana.vamana.isolate.PolicyEnforcer
 import com.yono.yono_vamana.vamana.isolate.WorkProfileManager
 import com.yono.yono_vamana.vamana.model.VamanaLayerId
 import com.yono.yono_vamana.vamana.model.VamanaLayerInfo
@@ -128,6 +135,10 @@ fun LayerDetailScreen(layerInfo: VamanaLayerInfo, onBack: () -> Unit) {
                         IsolateWorkProfileSection()
                         Spacer(modifier = Modifier.height(24.dp))
                     }
+                    if (layerInfo.id == VamanaLayerId.VERIFY) {
+                        VerifyActivationSection()
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
                     Text(
                         text = "Overview",
                         style = MaterialTheme.typography.titleMedium,
@@ -184,6 +195,7 @@ private fun IsolateWorkProfileSection() {
 
     var isProvisioned by remember { mutableStateOf(workProfileManager.isProfileReady()) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var showDeactivateDialog by remember { mutableStateOf(false) }
 
     val provisioningLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -220,7 +232,45 @@ private fun IsolateWorkProfileSection() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                ActiveStatusPill()
+                ActiveStatusPill(label = "VAMANA-Isolate is active")
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { showDeactivateDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Deactivate")
+                }
+
+                if (showDeactivateDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeactivateDialog = false },
+                        title = { Text("Deactivate VAMANA-Isolate?") },
+                        text = {
+                            Text(
+                                "This permanently removes the isolated work profile and everything " +
+                                    "in it, including this app instance. You'll need to activate it " +
+                                    "again from the personal profile to use it."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showDeactivateDialog = false
+                                    PolicyEnforcer(context).wipeProfileData()
+                                }
+                            ) {
+                                Text("Deactivate", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeactivateDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             } else if (isProvisioned) {
                 Text(
                     text = "The isolated work profile is active on this device.",
@@ -282,7 +332,64 @@ private fun IsolateWorkProfileSection() {
 }
 
 @Composable
-private fun ActiveStatusPill() {
+private fun VerifyActivationSection() {
+    val context = LocalContext.current
+    val verifyPreferences = remember { VerifyPreferences(context) }
+    var isActive by remember { mutableStateOf(verifyPreferences.isActive) }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Secure transaction display",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isActive) {
+                            "Overlay-resistant transaction rendering is enabled on this device."
+                        } else {
+                            "Not yet activated on this device."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = isActive,
+                    onCheckedChange = { checked ->
+                        isActive = checked
+                        verifyPreferences.isActive = checked
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = YonoOrange,
+                        checkedThumbColor = Color.White
+                    )
+                )
+            }
+
+            if (isActive) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ActiveStatusPill(label = "VAMANA-Verify is active")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveStatusPill(label: String) {
     Surface(
         shape = RoundedCornerShape(50),
         color = YonoGreenSuccess.copy(alpha = 0.15f)
@@ -299,7 +406,7 @@ private fun ActiveStatusPill() {
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = "VAMANA-Isolate is active",
+                text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = YonoGreenSuccess

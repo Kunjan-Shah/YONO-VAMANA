@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ── VAMANA-Verify: TEE-backed transaction confirmation ────────────── -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
     <!--
     ── Root-management package visibility ──────────────────────────────────
        HealthCheckEngine's DEVICE_ROOTED check looks for these specific

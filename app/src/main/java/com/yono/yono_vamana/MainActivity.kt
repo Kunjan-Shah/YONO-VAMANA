@@ -1,9 +1,9 @@
 package com.yono.yono_vamana
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import com.yono.yono_vamana.data.OnboardingPreferences
 import com.yono.yono_vamana.navigation.VamanaDestination
 import com.yono.yono_vamana.navigation.VamanaNavGraph
@@ -12,7 +12,10 @@ import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
 import com.yono.yono_vamana.vamana.isolate.WorkProfileManager
 import com.yono.yono_vamana.vamana.isolate.health.HealthCheckEngine
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (not ComponentActivity) — androidx.biometric.BiometricPrompt
+// requires a FragmentActivity host. Fully Compose-compatible: FragmentActivity
+// extends ComponentActivity, so setContent {} and everything else is unchanged.
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

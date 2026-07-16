@@ -11,4 +11,11 @@ sealed class VamanaDestination(val route: String) {
         const val ARG_LAYER_ID = "layerId"
         fun createRoute(layerId: String) = "layer_detail/$layerId"
     }
+
+    data object Transact : VamanaDestination("transact")
+
+    data object Payment : VamanaDestination("payment/{contactId}") {
+        const val ARG_CONTACT_ID = "contactId"
+        fun createRoute(contactId: String) = "payment/$contactId"
+    }
 }
