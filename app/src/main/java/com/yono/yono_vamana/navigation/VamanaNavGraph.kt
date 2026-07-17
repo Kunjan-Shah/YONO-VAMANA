@@ -23,6 +23,7 @@ import com.yono.yono_vamana.ui.transact.DummyContacts
 import com.yono.yono_vamana.ui.transact.TransactContactsScreen
 import com.yono.yono_vamana.vamana.model.VamanaLayerId
 import com.yono.yono_vamana.vamana.model.VamanaLayerRegistry
+import com.yono.yono_vamana.vamanagame.VamanaGameFlow
 
 private val TOP_LEVEL_ROUTES = setOf(VamanaDestination.Dashboard.route, VamanaDestination.Transact.route)
 
@@ -120,7 +121,15 @@ fun VamanaNavGraph(
 
             composable(VamanaDestination.SmsIntercepted.route) {
                 SmsInterceptedScreen(
-                    onBack = {
+                    onLearnMore = {
+                        navController.navigate(VamanaDestination.VamanaGame.route)
+                    }
+                )
+            }
+
+            composable(VamanaDestination.VamanaGame.route) {
+                VamanaGameFlow(
+                    onReturnToBankingApp = {
                         navController.navigate(VamanaDestination.Dashboard.route) {
                             popUpTo(VamanaDestination.Dashboard.route) { inclusive = true }
                             launchSingleTop = true

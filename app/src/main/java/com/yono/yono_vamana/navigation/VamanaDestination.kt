@@ -20,4 +20,6 @@ sealed class VamanaDestination(val route: String) {
     }
 
     data object SmsIntercepted : VamanaDestination("sms_intercepted")
+
+    data object VamanaGame : VamanaDestination("vamana_game")
 }

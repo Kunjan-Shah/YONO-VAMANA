@@ -1,5 +1,6 @@
 package com.yono.yono_vamana.ui.intercept
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,11 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GppMaybe
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,10 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.yono.yono_vamana.R
 import com.yono.yono_vamana.ui.theme.YONOVAMANATheme
 import com.yono.yono_vamana.ui.theme.YonoPurpleDark
 import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
@@ -39,7 +40,7 @@ import com.yono.yono_vamana.ui.theme.YonoPurpleLight
  * [com.yono.yono_vamana.vamana.intercept.SmsNotificationListenerService].
  */
 @Composable
-fun SmsInterceptedScreen(onBack: () -> Unit) {
+fun SmsInterceptedScreen(onLearnMore: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -57,14 +58,14 @@ fun SmsInterceptedScreen(onBack: () -> Unit) {
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.error.copy(alpha = 0.35f),
-                        modifier = Modifier.size(88.dp)
+                        modifier = Modifier.size(96.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Filled.GppMaybe,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(48.dp)
+                            Image(
+                                painter = painterResource(R.drawable.vamana_mascot),
+                                contentDescription = "VAMANA mascot",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(72.dp)
                             )
                         }
                     }
@@ -89,7 +90,7 @@ fun SmsInterceptedScreen(onBack: () -> Unit) {
 
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                 Button(
-                    onClick = onBack,
+                    onClick = onLearnMore,
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
@@ -101,7 +102,7 @@ fun SmsInterceptedScreen(onBack: () -> Unit) {
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Back to dashboard")
+                    Text("Click to learn more")
                 }
             }
         }
@@ -112,6 +113,6 @@ fun SmsInterceptedScreen(onBack: () -> Unit) {
 @Composable
 private fun SmsInterceptedScreenPreview() {
     YONOVAMANATheme {
-        SmsInterceptedScreen(onBack = {})
+        SmsInterceptedScreen(onLearnMore = {})
     }
 }

@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.provider.Telephony
 import android.service.notification.NotificationListenerService
@@ -69,7 +70,8 @@ class SmsNotificationListenerService : NotificationListenerService() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_vamana_alert)
+            .setSmallIcon(R.drawable.vamana_mascot)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.vamana_mascot))
             .setContentTitle("You might have got a malicious SMS")
             .setContentText("Stay protected with VAMANA")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
