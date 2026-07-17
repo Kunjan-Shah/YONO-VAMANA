@@ -15,6 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.yono.yono_vamana.ui.dashboard.DashboardScreen
 import com.yono.yono_vamana.ui.detail.LayerDetailScreen
+import com.yono.yono_vamana.ui.intercept.SmsInterceptedScreen
 import com.yono.yono_vamana.ui.navigation.VamanaBottomNavBar
 import com.yono.yono_vamana.ui.onboarding.SecuritySetupScreen
 import com.yono.yono_vamana.ui.transact.PaymentScreen
@@ -114,6 +115,17 @@ fun VamanaNavGraph(
                 PaymentScreen(
                     contact = contact,
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(VamanaDestination.SmsIntercepted.route) {
+                SmsInterceptedScreen(
+                    onBack = {
+                        navController.navigate(VamanaDestination.Dashboard.route) {
+                            popUpTo(VamanaDestination.Dashboard.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }

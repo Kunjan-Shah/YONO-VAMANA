@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
 
+    <!-- ── VAMANA-Intercept: malicious SMS notification alert ─────────────── -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!--
     ── Root-management package visibility ──────────────────────────────────
        HealthCheckEngine's DEVICE_ROOTED check looks for these specific
@@ -38,6 +41,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:label="@string/app_name"
             android:theme="@style/Theme.YONOVAMANA">
             <intent-filter>
@@ -46,6 +50,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+        ── VAMANA-Intercept SMS notification listener ─────────────────────
+           Bound by the system only after the user grants notification-listener
+           access from Settings (there is no runtime-permission dialog for this
+           special access). Toggling VAMANA-Intercept on the Intercept screen
+           requests/releases the binding via requestRebind/requestUnbind rather
+           than starting/stopping the service directly.
+        -->
+        <service
+            android:name=".vamana.intercept.SmsNotificationListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <!--
         ── VAMANA-Isolate work profile admin receiver ─────────────────────

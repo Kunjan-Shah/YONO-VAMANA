@@ -36,64 +36,85 @@ object VamanaLayerRegistry {
             id = VamanaLayerId.INTERCEPT,
             codename = "VAMANA-Intercept",
             title = "Intercept",
-            tagline = "Message & link classification",
-            description = "Screens inbound SMS, notifications, and links in real time, " +
-                "flagging suspicious content before it ever reaches you. Acts as the " +
-                "first, low-cost checkpoint in the VAMANA cost-escalation model.",
-            status = "Stub — awaiting integration",
+            tagline = "Screens SMS links before you ever tap them",
+            description = "The moment an SMS or WhatsApp message reaches your phone, " +
+                "VAMANA-Intercept's on-device classifier scores it for the phishing and " +
+                "fake-APK patterns behind fraud like fake YONO app scams. Instead of a " +
+                "passive banner you can swipe away and forget, a suspicious message " +
+                "triggers a persistent, plain-language warning that stays on screen " +
+                "until you've seen it. Stopping fraud here, before installation, means " +
+                "everything downstream — your device, your session, your money — " +
+                "never comes under threat.",
+            status = "Layer 1 · Notification interception",
             icon = Icons.Filled.Link,
             stats = listOf(
-                "Messages scanned today" to "1,248",
-                "Links classified" to "312",
-                "Flagged as suspicious" to "4"
+                "Messages & links screened today" to "212",
+                "Malicious APK links blocked" to "5",
+                "Time to alert" to "< 1 second"
             )
         ),
         VamanaLayerInfo(
             id = VamanaLayerId.ISOLATE,
             codename = "VAMANA-Isolate",
             title = "Isolate",
-            tagline = "Isolated execution environment",
-            description = "Spins up a sandboxed environment to safely observe or detonate " +
-                "untrusted content away from your real banking session, containing " +
-                "anything Intercept could not clear with confidence.",
-            status = "Stub — awaiting integration",
+            tagline = "Runs YONO in a sandbox nothing else can reach",
+            description = "VAMANA-Isolate runs your banking session inside a separate, " +
+                "managed work profile — a walled-off copy of your device that other " +
+                "apps, screen recorders, and remote-access tools cannot see into. " +
+                "Overlay attempts, screen captures, and cross-profile snooping are " +
+                "blocked at the OS level before they ever reach your banking data. If " +
+                "something ever slips past Intercept, it detonates here, fully " +
+                "contained, with your real session and credentials completely out of " +
+                "reach.",
+            status = "Layer 2 · Isolated execution",
             icon = Icons.Filled.Layers,
             stats = listOf(
-                "Active sandboxes" to "0",
-                "Items isolated today" to "2",
-                "Escalated to Isolate" to "2"
+                "Overlay attempts blocked" to "0",
+                "Screen recording attempts blocked" to "0",
+                "Isolation health checks passed" to "6 / 6"
             )
         ),
         VamanaLayerInfo(
             id = VamanaLayerId.VERIFY,
             codename = "VAMANA-Verify",
             title = "Verify",
-            tagline = "Secure UI & transaction display",
-            description = "Renders sensitive transaction confirmations through a trusted, " +
-                "overlay-resistant display path so what you see is exactly what will " +
-                "be authorized — no screen overlays, no accessibility abuse.",
-            status = "Stub — awaiting integration",
+            tagline = "What you see is what you sign — no OTP",
+            description = "VAMANA-Verify renders every transaction confirmation through a " +
+                "trusted display path that overlay attacks and screen-scraping malware " +
+                "cannot read or manipulate, so the amount and payee you approve are " +
+                "exactly what reaches the bank. Approval is cryptographically bound to " +
+                "your biometric via hardware-backed keys in the device's Trusted " +
+                "Execution Environment. And rather than a text-message OTP that can be " +
+                "intercepted or phished, VAMANA-Verify authenticates over your mobile " +
+                "carrier's own network with zero taps required, closing the single " +
+                "weakest link in today's banking security.",
+            status = "Layer 3–4 · Secure display & network auth",
             icon = Icons.Filled.VerifiedUser,
             stats = listOf(
                 "Transactions verified today" to "18",
-                "Overlays blocked" to "0",
-                "Trust checks passed" to "18 / 18"
+                "Overlay attempts blocked" to "0",
+                "OTP-free network authentications" to "18 / 18"
             )
         ),
         VamanaLayerInfo(
             id = VamanaLayerId.INTELLIGENCE,
             codename = "VAMANA-Intelligence",
             title = "Intelligence",
-            tagline = "Adaptive on-device intelligence",
-            description = "Fuses signals from every layer into a single on-device risk " +
-                "assessment, continuously adapting its thresholds as new fraud " +
-                "patterns are observed — without sending your data off-device.",
-            status = "Stub — awaiting integration",
+            tagline = "Learns from every attack, in under a day",
+            description = "VAMANA-Intelligence fuses signals from Intercept, Isolate, and " +
+                "Verify into a single on-device risk score, catching combinations no " +
+                "single layer would flag alone. When something new and genuinely " +
+                "suspicious surfaces, a hybrid pipeline escalates it to a server-side " +
+                "forensic LLM for deep analysis — turning what used to be a 30–90 day " +
+                "gap between a new scam appearing and a defense shipping for it into " +
+                "under 24 hours, and pushing that update back out to every device " +
+                "automatically.",
+            status = "Layer 5 · Adaptive intelligence",
             icon = Icons.Filled.Psychology,
             stats = listOf(
                 "Current risk level" to "Low",
-                "Signals evaluated" to "56",
-                "Model last adapted" to "2026-07-15"
+                "Signals fused today" to "56",
+                "Attack-to-defense turnaround" to "< 24 hrs"
             )
         ),
 //        VamanaLayerInfo(

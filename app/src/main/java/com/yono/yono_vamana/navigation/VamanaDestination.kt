@@ -18,4 +18,6 @@ sealed class VamanaDestination(val route: String) {
         const val ARG_CONTACT_ID = "contactId"
         fun createRoute(contactId: String) = "payment/$contactId"
     }
+
+    data object SmsIntercepted : VamanaDestination("sms_intercepted")
 }
