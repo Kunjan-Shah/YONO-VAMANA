@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.UserManager
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 
 /**
  * Applies VAMANA-Isolate's security policies to the managed work profile
@@ -55,6 +56,13 @@ class PolicyEnforcer(private val context: Context) {
         disableKeyguardFeatures()
         setNotificationPolicy()
         enableProfile()
+
+        VamanaActivityLog.log(
+            VamanaActivityLog.Category.ISOLATE,
+            "VAMANA-Isolate security policies applied: overlay blocking, screen-capture disabled, " +
+                "accessibility/keyboard allowlists, cross-profile leakage blocked, camera disabled, " +
+                "password policy enforced."
+        )
     }
 
     /** Re-apply the policies most likely to drift at runtime. */
@@ -235,6 +243,12 @@ class PolicyEnforcer(private val context: Context) {
 
     /** Wipe all data in the managed work profile. Destructive and irreversible. */
     fun wipeProfileData() {
+        // Logged before the call, not after — wipeData tears the profile down
+        // immediately, so there's no guarantee a post-call line ever gets written.
+        VamanaActivityLog.log(
+            VamanaActivityLog.Category.ISOLATE,
+            "Isolated work profile wipe requested — VAMANA-Isolate deactivating."
+        )
         try {
             dpm.wipeData(0)
         } catch (e: Exception) {

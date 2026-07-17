@@ -4,6 +4,7 @@ import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.security.Signature
 import java.time.Instant
@@ -48,8 +49,16 @@ sealed class TeeConfirmResult {
 class TeeTransactionAuthenticator(private val activity: FragmentActivity) {
 
     suspend fun confirmTransaction(payload: TeeTransactionPayload): TeeConfirmResult {
+        VamanaActivityLog.log(
+            VamanaActivityLog.Category.VERIFY,
+            "TEE transaction confirmation requested for ${payload.displayAmount} to ${payload.contactName}."
+        )
         val availability = TeeAvailabilityChecker(activity).check()
         if (!availability.isAvailable) {
+            VamanaActivityLog.log(
+                VamanaActivityLog.Category.VERIFY,
+                "TEE-backed authentication unavailable (${availability.reason})."
+            )
             return TeeConfirmResult.Unavailable(availability.reason)
         }
 
@@ -69,11 +78,16 @@ class TeeTransactionAuthenticator(private val activity: FragmentActivity) {
         signature: Signature
     ): TeeConfirmResult = suspendCancellableCoroutine { continuation ->
         val executor = ContextCompat.getMainExecutor(activity)
+        var attemptCount = 0
 
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 val cryptoSignature = result.cryptoObject?.signature
                 if (cryptoSignature == null) {
+                    VamanaActivityLog.log(
+                        VamanaActivityLog.Category.VERIFY,
+                        "Fingerprint authentication returned no signature object — treating as an error."
+                    )
                     if (continuation.isActive) {
                         continuation.resume(TeeConfirmResult.Error("No signature object was returned."))
                     }
@@ -81,8 +95,15 @@ class TeeTransactionAuthenticator(private val activity: FragmentActivity) {
                 }
                 val outcome = try {
                     cryptoSignature.update(payload.toSignableBytes())
-                    TeeConfirmResult.Success(TeeAttestation(payload, cryptoSignature.sign()))
+                    val signed = TeeConfirmResult.Success(TeeAttestation(payload, cryptoSignature.sign()))
+                    VamanaActivityLog.log(
+                        VamanaActivityLog.Category.VERIFY,
+                        "Fingerprint matched for ${payload.displayAmount} to ${payload.contactName} after " +
+                            "${attemptCount + 1} attempt(s) — transaction signed inside the TEE."
+                    )
+                    signed
                 } catch (e: Exception) {
+                    VamanaActivityLog.log(VamanaActivityLog.Category.VERIFY, "Signing failed after fingerprint match: ${e.message}")
                     TeeConfirmResult.Error("Signing failed: ${e.message}")
                 }
                 if (continuation.isActive) continuation.resume(outcome)
@@ -93,15 +114,30 @@ class TeeTransactionAuthenticator(private val activity: FragmentActivity) {
                 val outcome = when (errorCode) {
                     BiometricPrompt.ERROR_USER_CANCELED,
                     BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-                    BiometricPrompt.ERROR_CANCELED -> TeeConfirmResult.Cancelled
-                    else -> TeeConfirmResult.Error(errString.toString())
+                    BiometricPrompt.ERROR_CANCELED -> {
+                        VamanaActivityLog.log(
+                            VamanaActivityLog.Category.VERIFY,
+                            "Fingerprint authentication cancelled by user after $attemptCount failed attempt(s)."
+                        )
+                        TeeConfirmResult.Cancelled
+                    }
+                    else -> {
+                        VamanaActivityLog.log(VamanaActivityLog.Category.VERIFY, "Fingerprint authentication error: $errString")
+                        TeeConfirmResult.Error(errString.toString())
+                    }
                 }
                 continuation.resume(outcome)
             }
 
             // A single mismatched fingerprint — the prompt keeps listening for
             // another attempt, so the coroutine only resolves on a terminal callback.
-            override fun onAuthenticationFailed() = Unit
+            override fun onAuthenticationFailed() {
+                attemptCount++
+                VamanaActivityLog.log(
+                    VamanaActivityLog.Category.VERIFY,
+                    "Fingerprint did not match for ${payload.displayAmount} to ${payload.contactName} (attempt $attemptCount)."
+                )
+            }
         }
 
         val prompt = BiometricPrompt(activity, executor, callback)
@@ -113,6 +149,10 @@ class TeeTransactionAuthenticator(private val activity: FragmentActivity) {
             .setAllowedAuthenticators(BIOMETRIC_STRONG)
             .build()
 
+        VamanaActivityLog.log(
+            VamanaActivityLog.Category.VERIFY,
+            "Fingerprint prompt shown for ${payload.displayAmount} to ${payload.contactName}."
+        )
         prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(signature))
     }
 }

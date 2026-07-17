@@ -18,6 +18,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.yono.yono_vamana.MainActivity
 import com.yono.yono_vamana.R
 import com.yono.yono_vamana.data.InterceptPreferences
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 
 /**
  * Watches notifications posted by the device's default SMS app and, while
@@ -31,11 +32,13 @@ class SmsNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(LOG_TAG, "VAMANA-Intercept listener connected")
+        VamanaActivityLog.log(VamanaActivityLog.Category.INTERCEPT, "SMS notification listener connected — actively monitoring.")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.i(LOG_TAG, "VAMANA-Intercept listener disconnected")
+        VamanaActivityLog.log(VamanaActivityLog.Category.INTERCEPT, "SMS notification listener disconnected.")
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -46,11 +49,13 @@ class SmsNotificationListenerService : NotificationListenerService() {
         val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this)
         if (defaultSmsPackage == null || sbn.packageName != defaultSmsPackage) return
 
+        VamanaActivityLog.log(VamanaActivityLog.Category.INTERCEPT, "New SMS notification received from the default messaging app.")
         showMaliciousSmsAlert()
     }
 
     private fun showMaliciousSmsAlert() {
         ensureNotificationChannel()
+        VamanaActivityLog.log(VamanaActivityLog.Category.INTERCEPT, "Malicious SMS warning raised — persistent alert shown to the user.")
 
         val contentIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

@@ -71,6 +71,7 @@ import com.yono.yono_vamana.ui.theme.YonoPurpleDarkest
 import com.yono.yono_vamana.ui.theme.YonoPurpleLight
 import com.yono.yono_vamana.vamana.intercept.NotificationListenerAccess
 import com.yono.yono_vamana.vamana.intercept.SmsNotificationListenerService
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 import com.yono.yono_vamana.vamana.isolate.PolicyEnforcer
 import com.yono.yono_vamana.vamana.isolate.WorkProfileManager
 import com.yono.yono_vamana.vamana.model.VamanaLayerId
@@ -166,8 +167,23 @@ fun LayerDetailScreen(layerInfo: VamanaLayerInfo, onBack: () -> Unit) {
                         IntelligenceActivationSection(
                             isActive = isIntelligenceActive,
                             onToggle = { checked ->
-                                isIntelligenceActive = checked
-                                intelligencePreferences.isActive = checked
+                                if (checked) {
+                                    isIntelligenceActive = checked
+                                    intelligencePreferences.isActive = checked
+                                    VamanaActivityLog.log(
+                                        VamanaActivityLog.Category.LAYER,
+                                        "VAMANA-Intelligence activated — activity logging started for all layers."
+                                    )
+                                } else {
+                                    // Log while the gate is still open — flipping the pref first
+                                    // would silently swallow this final line.
+                                    VamanaActivityLog.log(
+                                        VamanaActivityLog.Category.LAYER,
+                                        "VAMANA-Intelligence deactivated — activity logging stopped."
+                                    )
+                                    isIntelligenceActive = checked
+                                    intelligencePreferences.isActive = checked
+                                }
                             }
                         )
                         Spacer(modifier = Modifier.height(24.dp))
@@ -235,6 +251,10 @@ private fun InterceptActivationSection() {
         interceptPreferences.isActive = true
         statusMessage = null
         SmsNotificationListenerService.requestActivate(context)
+        VamanaActivityLog.log(
+            VamanaActivityLog.Category.LAYER,
+            "VAMANA-Intercept activated — now watching notifications from the default SMS app."
+        )
     }
 
     // Settings doesn't return a meaningful result code for this special-access
@@ -243,9 +263,17 @@ private fun InterceptActivationSection() {
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         if (NotificationListenerAccess.isEnabled(context)) {
+            VamanaActivityLog.log(
+                VamanaActivityLog.Category.PERMISSION,
+                "Notification listener access granted for VAMANA-Intercept."
+            )
             activate()
         } else {
             statusMessage = "Notification access wasn't granted, so VAMANA-Intercept can't watch for SMS alerts."
+            VamanaActivityLog.log(
+                VamanaActivityLog.Category.PERMISSION,
+                "Notification listener access was not granted — VAMANA-Intercept stays inactive."
+            )
         }
     }
 
@@ -262,9 +290,11 @@ private fun InterceptActivationSection() {
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
+            VamanaActivityLog.log(VamanaActivityLog.Category.PERMISSION, "POST_NOTIFICATIONS permission granted.")
             checkListenerAndActivate()
         } else {
             statusMessage = "Notification permission is required to raise SMS alerts."
+            VamanaActivityLog.log(VamanaActivityLog.Category.PERMISSION, "POST_NOTIFICATIONS permission denied by user.")
         }
     }
 
@@ -316,6 +346,7 @@ private fun InterceptActivationSection() {
                             interceptPreferences.isActive = false
                             statusMessage = null
                             SmsNotificationListenerService.requestDeactivate(context)
+                            VamanaActivityLog.log(VamanaActivityLog.Category.LAYER, "VAMANA-Intercept deactivated by user.")
                         }
                     },
                     colors = SwitchDefaults.colors(
@@ -360,8 +391,13 @@ private fun IsolateWorkProfileSection() {
             workProfileManager.markProfileCreated()
             isProvisioned = true
             statusMessage = null
+            VamanaActivityLog.log(
+                VamanaActivityLog.Category.ISOLATE,
+                "Work profile provisioning approved by user — isolated work profile created."
+            )
         } else {
             statusMessage = "Setup was cancelled or failed."
+            VamanaActivityLog.log(VamanaActivityLog.Category.ISOLATE, "Work profile provisioning was cancelled or failed.")
         }
     }
 
@@ -528,6 +564,14 @@ private fun VerifyActivationSection() {
                     onCheckedChange = { checked ->
                         isActive = checked
                         verifyPreferences.isActive = checked
+                        VamanaActivityLog.log(
+                            VamanaActivityLog.Category.LAYER,
+                            if (checked) {
+                                "VAMANA-Verify activated — transactions will require TEE-backed confirmation."
+                            } else {
+                                "VAMANA-Verify deactivated by user."
+                            }
+                        )
                     },
                     colors = SwitchDefaults.colors(
                         checkedTrackColor = YonoOrange,

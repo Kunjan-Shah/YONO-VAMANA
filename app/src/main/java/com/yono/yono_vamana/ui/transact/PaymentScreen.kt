@@ -65,6 +65,7 @@ import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionAuthenticator
 import com.yono.yono_vamana.vamana.verify.tee.TeeTransactionPayload
 import com.yono.yono_vamana.vamana.verify.sna.CellularNetworkProvider
 import com.yono.yono_vamana.vamana.verify.sna.SnaDemoConfig
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 import kotlinx.coroutines.launch
 import java.time.Instant
 
@@ -88,6 +89,7 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
 
     fun trace(line: String) {
         Log.i(SNA_LOG_TAG, line)
+        VamanaActivityLog.log(VamanaActivityLog.Category.TRANSACTION, line)
     }
 
     fun confirmPayment() {
@@ -199,8 +201,12 @@ fun PaymentScreen(contact: DummyContact, onBack: () -> Unit) {
                     }
                     newBalance = txResult.newBalance
                     isConfirmed = true
+                    trace("Payment of ₹$amount to ${contact.name} confirmed. New balance: ₹${txResult.newBalance}.")
                 }
-                else -> errorMessage = txResult.message.ifBlank { "The bank rejected this transaction." }
+                else -> {
+                    errorMessage = txResult.message.ifBlank { "The bank rejected this transaction." }
+                    trace("Payment of ₹$amount to ${contact.name} failed: $errorMessage")
+                }
             }
         }
     }

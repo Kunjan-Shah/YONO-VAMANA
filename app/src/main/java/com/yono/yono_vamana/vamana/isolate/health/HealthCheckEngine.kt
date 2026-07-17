@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import com.yono.yono_vamana.vamana.intelligence.VamanaActivityLog
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -67,14 +68,21 @@ data class HealthCheckReport(val results: List<HealthCheckResult>) {
 class HealthCheckEngine(private val context: Context) {
 
     fun runAllChecks(): HealthCheckReport {
-        return HealthCheckReport(
-            listOf(
-                checkAdbEnabled(),
-                checkDeviceRooted(),
-                checkBootloaderStatus(),
-                checkPatchLevel()
-            )
+        val results = listOf(
+            checkAdbEnabled(),
+            checkDeviceRooted(),
+            checkBootloaderStatus(),
+            checkPatchLevel()
         )
+        val passed = results.count { it.passed }
+        val summary = "Work profile health check completed: $passed/${results.size} checks passed" +
+            if (passed < results.size) {
+                " (failed: ${results.filterNot { it.passed }.joinToString { it.checkName }})."
+            } else {
+                "."
+            }
+        VamanaActivityLog.log(VamanaActivityLog.Category.ISOLATE, summary)
+        return HealthCheckReport(results)
     }
 
     // ── Check 1: USB Debugging ────────────────────────────────────────────────
