@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="yono_purple_darkest">#FF230A38</color>
-    <color name="yono_purple_dark">#FF3A0F5C</color>
-    <color name="yono_purple">#FF5C1A8C</color>
-    <color name="yono_purple_light">#FF8A4FC0</color>
-    <color name="yono_orange">#FFF7941D</color>
-    <color name="yono_yellow">#FFFFC72C</color>
-    <color name="yono_background">#FFF7F5FA</color>
+    <color name="digi_purple_darkest">#FF230A38</color>
+    <color name="digi_purple_dark">#FF3A0F5C</color>
+    <color name="digi_purple">#FF5C1A8C</color>
+    <color name="digi_purple_light">#FF8A4FC0</color>
+    <color name="digi_orange">#FFF7941D</color>
+    <color name="digi_yellow">#FFFFC72C</color>
+    <color name="digi_background">#FFF7F5FA</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

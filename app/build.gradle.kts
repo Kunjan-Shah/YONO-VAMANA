@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.yono.yono_vamana"
+    namespace = "com.digi.digi_vamana"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.yono.yono_vamana"
+        applicationId = "com.digi.digi_vamana"
         minSdk = 31
         targetSdk = 36
         versionCode = 1

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * YONO-VAMANA banking server — a small, self-contained demo backend for the
+ * digi-VAMANA banking server — a small, self-contained demo backend for the
  * VAMANA-Verify TEE-backed transaction flow AND Silent Network Authentication
  * (SNA), the third leg of which is telecom-server.js (its own process, its
  * own terminal, its own port — see that file's doc comment for the protocol).
@@ -31,7 +31,7 @@ const crypto = require('crypto');
 
 const PORT = 8787;
 const TELECOM_URL = 'http://127.0.0.1:8788';
-const CLIENT_ID = 'YONO-VAMANA-BANK';
+const CLIENT_ID = 'digi-VAMANA-BANK';
 const CLIENT_SECRET = 'demo-client-secret-change-me'; // must match telecom-server.js
 const HMAC_SECRET = 'demo-hmac-session-key-change-me'; // must match telecom-server.js
 const MAX_TIMESTAMP_SKEW_MS = 60_000;
@@ -323,7 +323,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  log(`YONO-VAMANA banking server listening on http://127.0.0.1:${PORT}`);
+  log(`digi-VAMANA banking server listening on http://127.0.0.1:${PORT}`);
   log(`Telecom server expected at ${TELECOM_URL} — start telecom-server.js too`);
   printLedger();
 });

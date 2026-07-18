@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * YONO-VAMANA telecom (MNO) server — the third leg of the Silent Network
+ * digi-VAMANA telecom (MNO) server — the third leg of the Silent Network
  * Authentication demo, alongside server.js (bank) and the Android app (phone).
  *
  * Real, working cryptography: an RSA-2048 keypair generated at startup, RS256
@@ -31,7 +31,7 @@ const http = require('http');
 const crypto = require('crypto');
 
 const PORT = 8788;
-const BANK_CLIENT_ID = 'YONO-VAMANA-BANK';
+const BANK_CLIENT_ID = 'digi-VAMANA-BANK';
 const BANK_CLIENT_SECRET = 'demo-client-secret-change-me'; // must match server.js
 const HMAC_SECRET = 'demo-hmac-session-key-change-me'; // must match server.js
 
@@ -117,7 +117,7 @@ function handleToken(req, res) {
       }
 
       const exp = Math.floor(Date.now() / 1000) + 300;
-      const token = signJwt({ iss: 'yono-vamana-telecom', sub: client_id, scope: 'sna.verify', exp });
+      const token = signJwt({ iss: 'digi-vamana-telecom', sub: client_id, scope: 'sna.verify', exp });
       log('  -> access_token issued (RS256), expires in 300s');
       sendJson(res, 200, { access_token: token, token_type: 'Bearer', expires_in: 300 });
     })
@@ -183,6 +183,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  log(`YONO-VAMANA telecom server listening on http://127.0.0.1:${PORT}`);
+  log(`digi-VAMANA telecom server listening on http://127.0.0.1:${PORT}`);
   log('Public key served at GET /public-key');
 });

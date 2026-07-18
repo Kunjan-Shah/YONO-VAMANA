@@ -1,20 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="8bb5add4-ce1d-4eca-aec8-63bf23a47273" />
+    <option name="activeSessionId" value="7f27ac5b-35ae-4bf6-8509-c540be98d489" />
     <option name="openSessionIds">
       <list>
         <option value="8bb5add4-ce1d-4eca-aec8-63bf23a47273" />
+        <option value="7f27ac5b-35ae-4bf6-8509-c540be98d489" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
-        <entry key="8bb5add4-ce1d-4eca-aec8-63bf23a47273" value="/sessions/10ecb79e-2d7f-4a90-b4af-6aaea00a86f4" />
+        <entry key="7f27ac5b-35ae-4bf6-8509-c540be98d489" value="/sessions/10ecb79e-2d7f-4a90-b4af-6aaea00a86f4" />
+        <entry key="8bb5add4-ce1d-4eca-aec8-63bf23a47273" value="/sessions/ec7b1aa5-3b52-4487-ba29-e4d738359b3f" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="8bb5add4-ce1d-4eca-aec8-63bf23a47273" value="understand the full codebase of YONO-VAMANA thorou" />
+        <entry key="7f27ac5b-35ae-4bf6-8509-c540be98d489" value="understand the full codebase of YONO-VAMANA thorou" />
+        <entry key="8bb5add4-ce1d-4eca-aec8-63bf23a47273" value="change the name of the entire application from YON" />
       </map>
     </option>
   </component>

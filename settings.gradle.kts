@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "YONO-VAMANA"
+rootProject.name = "digi-VAMANA"
 include(":app")
  
